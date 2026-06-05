@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Resumable.js - 大文件分片上传演示</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px 30px;
+        }
+
+        .header h1 {
+            margin: 0 0 5px;
+            font-size: 24px;
+        }
+
+        .header p {
+            margin: 0;
+            opacity: 0.8;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            padding: 30px;
+            border-bottom: 1px solid #eee;
+            text-align: center;
+        }
+
+        .btn {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 5px;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #219a52;
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+        }
+
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+
+        .drop-zone {
+            margin: 20px 0;
+            padding: 40px;
+            border: 2px dashed #bdc3c7;
+            border-radius: 8px;
+            background: #f9f9f9;
+            transition: all 0.2s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #3498db;
+            background: #eaf5ff;
+        }
+
+        .info-text {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        .file-list {
+            padding: 20px 30px;
+        }
+
+        .file-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            padding: 15px;
+            border-left: 4px solid #3498db;
+            transition: all 0.2s;
+        }
+
+        .file-item.completed {
+            border-left-color: #27ae60;
+            opacity: 0.8;
+        }
+
+        .file-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .file-name {
+            font-weight: 600;
+            word-break: break-all;
+            flex: 1;
+        }
+
+        .file-size {
+            color: #7f8c8d;
+            font-size: 12px;
+        }
+
+        .progress-bar-container {
+            background: #e9ecef;
+            border-radius: 20px;
+            height: 8px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #3498db;
+            border-radius: 20px;
+            transition: width 0.2s;
+        }
+
+        .file-status {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .file-actions {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-small {
+            padding: 4px 12px;
+            font-size: 12px;
+        }
+
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: #95a5a6;
+        }
+
+        .global-controls {
+            background: #ecf0f1;
+            padding: 15px 30px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            border-top: 1px solid #ddd;
+        }
+
+        .badge {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .upload-area {
+                padding: 20px;
+            }
+
+            .file-list {
+                padding: 15px;
+            }
+
+            .global-controls {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📁 大文件分片上传</h1>
+            <p>支持断点续传、分片上传 | 基于 Resumable.js</p>
+        </div>
+        <div class="upload-area">
+            <button id="browseButton" class="btn">📂 选择文件</button>
+            <div id="dropZone" class="drop-zone">
+                <div>📎 或将文件拖拽到此区域</div>
+                <div class="info-text">支持大文件上传，自动分片，网络中断后可续传</div>
+            </div>
+            <div class="info-text">
+                💡 提示：每个分片上传前会检查是否已存在，实现断点续传
+            </div>
+        </div>
+        <div class="file-list" id="fileListContainer">
+            <div class="empty-message">暂无上传文件，点击"选择文件"开始上传</div>
+        </div>
+        <div class="global-controls">
+            <button id="pauseAllBtn" class="btn-secondary">⏸️ 全部暂停</button>
+            <button id="resumeAllBtn" class="btn-success">▶️ 全部继续</button>
+            <button id="cancelAllBtn" class="btn-danger">🗑️ 全部取消</button>
+        </div>
+    </div>
+
+    <!-- 推荐使用官方 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/resumablejs@1.1.0/resumable.min.js"></script>
+    <script>
+        // ==================== 配置区域 ====================
+        // 请根据实际后端地址修改
+        const UPLOAD_URL = 'http://news-awards.xxmm.com/capi/apply/upload-attach-file';  // 替换为你的后端上传地址
+        const TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJuZXdzLWF3YXJkcyIsImlhdCI6MTc4MDM5MTEzOCwiZXhwIjoxNzgwOTk1OTM4LCJ1aWQiOjJ9.3362HE76oV_TSlo-y32q8nA7jfle4HCTbLr8uVJdEjo';  // 替换为真实的 token
+
+        // 获取 applyId 的方式：可以从 URL 参数或页面数据中获取
+        function getApplyId() {
+            // 示例 1: 从 URL 参数中获取 ?applyId=123
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlApplyId = urlParams.get('applyId');
+            if (urlApplyId) return parseInt(urlApplyId);
+
+            // 示例 2: 从页面某个隐藏元素获取（可根据实际业务调整）
+            // const hiddenApplyId = document.querySelector('input[name="applyId"]')?.value;
+            // if (hiddenApplyId) return parseInt(hiddenApplyId);
+
+            // 示例 3: 测试用 applyId（实际使用时请替换）
+            console.warn('未找到 applyId，使用默认值 1，请根据实际情况修改');
+            return 1;
+        }
+
+        // 获取文件大小的可读格式
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // ==================== 初始化 Resumable ====================
+        const r = new Resumable({
+            target: UPLOAD_URL,
+            // 分片大小：5MB (可以根据实际情况调整)
+            chunkSize: 5 * 1024 * 1024,
+            // 同时上传的分片数量
+            simultaneousUploads: 3,
+            // 启用分片校验（断点续传的核心）
+            testChunks: true,
+            // 每个分片失败后重试次数
+            maxChunkRetries: 3,
+            // 重试间隔（毫秒）
+            chunkRetryInterval: 1000,
+            // 上传方法
+            uploadMethod: 'POST',
+            // 额外携带的请求头（鉴权 token）
+            headers: {
+                'Authorization': 'Bearer ' + TOKEN
+            },
+            // 固定携带的 query 参数（每个请求都会附带）
+            query: {
+                applyId: 14
+            },
+            // 分片参数名自定义（保持默认即可，与后端约定一致）
+            // 以下为默认值，无需修改，仅供了解
+            // chunkNumberParameterName: 'resumableChunkNumber',
+            // totalChunksParameterName: 'resumableTotalChunks',
+            // chunkSizeParameterName: 'resumableChunkSize',
+            // totalSizeParameterName: 'resumableTotalSize',
+            // identifierParameterName: 'resumableIdentifier',
+            // fileNameParameterName: 'resumableFilename',
+            // relativePathParameterName: 'resumableRelativePath'
+        });
+
+        // 如果不支持 HTML5 File API，降级提醒
+        if (!r.support) {
+            alert('浏览器不支持文件分片上传，请升级至最新版 Chrome、Firefox 或 Edge');
+        }
+
+        // ==================== UI 元素绑定 ====================
+        // 绑定选择文件按钮
+        r.assignBrowse(document.getElementById('browseButton'));
+        // 绑定拖拽区域
+        const dropZone = document.getElementById('dropZone');
+        r.assignDrop(dropZone);
+
+        // 拖拽样式优化
+        dropZone.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+        });
+
+        // ==================== 文件列表渲染管理 ====================
+        const fileListContainer = document.getElementById('fileListContainer');
+        // 存储每个文件的 DOM 元素引用
+        const fileItemsMap = new Map();
+
+        // 渲染文件列表项
+        function renderFileItem(file) {
+            const uniqueId = file.uniqueIdentifier;
+            if (fileItemsMap.has(uniqueId)) {
+                // 已存在则更新，不重复创建
+                updateFileItemProgress(file);
+                return;
+            }
+
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.id = `file-${uniqueId}`;
+            fileItem.innerHTML = `
+            <div class="file-header">
+                <span class="file-name">📄 ${escapeHtml(file.fileName)}</span>
+                <span class="file-size">${formatFileSize(file.size)}</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-${uniqueId}"></div>
+            </div>
+            <div class="file-status" id="status-${uniqueId}">⏳ 等待上传</div>
+            <div class="file-actions">
+                <button class="btn-small btn-secondary" data-action="pause" data-id="${uniqueId}">⏸️ 暂停</button>
+                <button class="btn-small btn-success" data-action="resume" data-id="${uniqueId}">▶️ 继续</button>
+                <button class="btn-small btn-danger" data-action="cancel" data-id="${uniqueId}">🗑️ 删除</button>
+            </div>
+        `;
+            fileListContainer.appendChild(fileItem);
+            fileItemsMap.set(uniqueId, {
+                element: fileItem,
+                file: file
+            });
+
+            // 绑定按钮事件（委托式也可以，为了清晰直接绑定）
+            const pauseBtn = fileItem.querySelector('[data-action="pause"]');
+            const resumeBtn = fileItem.querySelector('[data-action="resume"]');
+            const cancelBtn = fileItem.querySelector('[data-action="cancel"]');
+
+            pauseBtn.addEventListener('click', () => {
+                file.pause();
+                updateFileStatus(uniqueId, '⏸️ 已暂停');
+            });
+            resumeBtn.addEventListener('click', () => {
+                file.resume();
+                updateFileStatus(uniqueId, '▶️ 继续上传');
+            });
+            cancelBtn.addEventListener('click', () => {
+                file.cancel();
+                // 从 DOM 和 Map 中移除
+                const item = fileItemsMap.get(uniqueId);
+                if (item && item.element) {
+                    item.element.remove();
+                }
+                fileItemsMap.delete(uniqueId);
+                // 如果列表为空，显示占位提示
+                if (fileItemsMap.size === 0) {
+                    showEmptyMessage();
+                }
+            });
+
+            // 更新隐藏的列表提示
+            hideEmptyMessage();
+        }
+
+        function updateFileItemProgress(file) {
+            const uniqueId = file.uniqueIdentifier;
+            const progressBar = document.getElementById(`progress-${uniqueId}`);
+            if (progressBar) {
+                const progress = file.progress() * 100;
+                progressBar.style.width = `${progress}%`;
+            }
+        }
+
+        function updateFileStatus(uniqueId, statusText, isError = false) {
+            const statusEl = document.getElementById(`status-${uniqueId}`);
+            if (statusEl) {
+                statusEl.innerHTML = isError ? `❌ ${statusText}` : statusText;
+                if (isError) {
+                    statusEl.style.color = '#e74c3c';
+                } else {
+                    statusEl.style.color = '#7f8c8d';
+                }
+            }
+        }
+
+        function markFileCompleted(file, message) {
+            const uniqueId = file.uniqueIdentifier;
+            const fileItem = document.getElementById(`file-${uniqueId}`);
+            if (fileItem) {
+                fileItem.classList.add('completed');
+                updateFileStatus(uniqueId, '✅ 上传完成！');
+                // 更新进度条为 100%
+                const progressBar = document.getElementById(`progress-${uniqueId}`);
+                if (progressBar) progressBar.style.width = '100%';
+
+                // 可选：解析后端返回的 JSON，显示更多信息
+                try {
+                    const response = JSON.parse(message);
+                    console.log('后端响应:', response);
+                    if (response.data && response.data.recordId) {
+                        updateFileStatus(uniqueId, `✅ 上传完成 (记录ID: ${response.data.recordId})`);
+                    }
+                } catch (e) {
+                    // 非 JSON 响应，忽略
+                }
+            }
+        }
+
+        function showEmptyMessage() {
+            if (fileItemsMap.size === 0 && !document.querySelector('.file-list .empty-message')) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'empty-message';
+                emptyDiv.id = 'emptyMessage';
+                emptyDiv.innerText = '暂无上传文件，点击"选择文件"开始上传';
+                fileListContainer.appendChild(emptyDiv);
+            }
+        }
+
+        function hideEmptyMessage() {
+            const emptyMsg = document.getElementById('emptyMessage');
+            if (emptyMsg) emptyMsg.remove();
+        }
+
+        // 简单的防 XSS
+        function escapeHtml(str) {
+            return str.replace(/[&<>]/g, function (m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
+
+        // ==================== Resumable 事件监听 ====================
+        // 文件被添加到队列
+        r.on('fileAdded', function (file, event) {
+            console.log('文件已添加:', file.fileName);
+            renderFileItem(file);
+            // 默认自动开始上传（可根据需求注释掉）
+            r.upload();
+        });
+
+        // 文件上传进度更新
+        r.on('fileProgress', function (file) {
+            updateFileItemProgress(file);
+            const uniqueId = file.uniqueIdentifier;
+            const progress = Math.round(file.progress() * 100);
+            updateFileStatus(uniqueId, `⏫ 上传中 ${progress}%`);
+        });
+
+        // 文件上传成功
+        r.on('fileSuccess', function (file, message) {
+            console.log('文件上传成功:', file.fileName, message);
+            markFileCompleted(file, message);
+        });
+
+        // 文件上传出错
+        r.on('fileError', function (file, message) {
+            console.error('文件上传出错:', file.fileName, message);
+            updateFileStatus(file.uniqueIdentifier, `上传失败: ${message.substring(0, 100)}`, true);
+        });
+
+        // 文件重试
+        r.on('fileRetry', function (file) {
+            updateFileStatus(file.uniqueIdentifier, '🔄 正在重试...');
+        });
+
+        // 所有文件上传完毕
+        r.on('complete', function () {
+            console.log('所有文件上传完成');
+            // 可以在这里添加全局完成后的回调，如提示用户
+        });
+
+        // 全局上传进度（可选）
+        r.on('progress', function () {
+            // 如果需要整体进度条，可以在这里处理，本例暂不实现
+        });
+
+        // 分片上传开始（可用于显示更精细的日志）
+        r.on('chunkingStart', function (file) {
+            updateFileStatus(file.uniqueIdentifier, '🔪 正在切分文件...');
+        });
+
+        r.on('chunkingComplete', function (file) {
+            updateFileStatus(file.uniqueIdentifier, '⚡ 分片准备完成，开始上传');
+        });
+
+        // ==================== 全局控制按钮 ====================
+        document.getElementById('pauseAllBtn').addEventListener('click', function () {
+            r.pause();
+            // 更新所有文件状态显示为暂停
+            for (let [uniqueId, item] of fileItemsMap.entries()) {
+                updateFileStatus(uniqueId, '⏸️ 已暂停（全局暂停）');
+            }
+            console.log('全部暂停');
+        });
+
+        document.getElementById('resumeAllBtn').addEventListener('click', function () {
+            r.upload();  // 恢复上传
+            for (let [uniqueId, item] of fileItemsMap.entries()) {
+                // 如果文件未完成，更新状态为恢复
+                if (item.file.progress() < 1) {
+                    updateFileStatus(uniqueId, '▶️ 继续上传');
+                }
+            }
+            console.log('全部继续');
+        });
+
+        document.getElementById('cancelAllBtn').addEventListener('click', function () {
+            if (confirm('确定要取消所有上传并删除文件列表吗？')) {
+                r.cancel();  // 取消所有上传并从列表中移除
+                // 清空所有 DOM 元素
+                for (let [uniqueId, item] of fileItemsMap.entries()) {
+                    if (item.element) item.element.remove();
+                }
+                fileItemsMap.clear();
+                showEmptyMessage();
+                console.log('全部取消');
+            }
+        });
+
+        // 初始显示空状态
+        showEmptyMessage();
+    </script>
+</body>
+
+</html>
